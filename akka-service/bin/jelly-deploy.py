@@ -11,20 +11,18 @@ import stat
 import json
 import re
 
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 APP = 'drz'
-DEFAULT_HOSTNAME = '127.0.0.1'
-DEFAULT_MASTER = '127.0.0.1:2181'
-HOME = os.path.join(sys.argv[0], '..')
+HOME = os.path.join(os.path.dirname(sys.argv[0]), '..')
 pattern = re.compile(r'^([\da-z]+)\.(service-\w+-\d\.\d)$')
-print('''
+print '''
       _      _ _             ____             _             
      | | ___| | |_   _      |  _ \  ___ _ __ | | ___  _   _ 
   _  | |/ _ \ | | | | |_____| | | |/ _ \ '_ \| |/ _ \| | | |
  | |_| |  __/ | | |_| |_____| |_| |  __/ |_) | | (_) | |_| |
   \___/ \___|_|_|\__, |     |____/ \___| .__/|_|\___/ \__, |
                  |___/                 |_|            |___/ 
-''')
+'''
 print 'home: %s' % HOME
 
 parser = arg.ArgumentParser(prog="convert")
@@ -50,15 +48,10 @@ if match:
     ZIP_PATH = os.path.join(os.path.split(ZIP_PATH)[0], match.group(2))
 print 'zip path: %s' % ZIP_PATH
 
-try:
-    config_path = os.path.join(HOME, 'config/akka.json')
-    f = open(config_path, 'r')
-    global_config = json.loads(f.read())
-    f.close()
-except FileNotFoundError as e:
-    print 'no config found'
-    exit(1)
-
+config_path = os.path.join(HOME, 'config/akka.json')
+f = open(config_path, 'r')
+global_config = json.loads(f.read())
+f.close()
 
 def __find_runnable_script(path=ZIP_PATH):
     """
@@ -89,9 +82,9 @@ def unzip():
     :return: 
     """
     if not is_newer():
-        print('zip is older OR unzip failed')
+        print 'zip is older OR unzip failed'
         return True
-    print('unzip... %s ---> %s' % (args.package, OUTPUT_DIR))
+    print 'unzip... %s ---> %s' % (args.package, OUTPUT_DIR)
     if args.package.endswith('.zip'):
         with zipfile.ZipFile(args.package) as f:
             f.extractall(OUTPUT_DIR)
@@ -101,7 +94,7 @@ def unzip():
             f.extractall(OUTPUT_DIR)
         return True
     else:
-        print('FAILED...发布包必须是.zip或.tar!')
+        print 'FAILED...发布包必须是.zip或.tar!'
         parser.print_help()
         return False
 
@@ -158,7 +151,7 @@ def deploy():
         else:
             parser.print_help()
 
-    print('finish...')
+    print 'finish...'
     exit(0)
 
 
@@ -166,6 +159,6 @@ def deploy():
 ./jelly-deploy.py [-h] [-up | -p] -v VERSION PACKAGE
 """
 
-print('args %s' % sys.argv)
-print('after parse % s' % args)
+print 'args %s' % sys.argv
+print 'after parse % s' % args
 deploy()
