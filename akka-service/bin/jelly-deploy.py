@@ -11,36 +11,32 @@ import stat
 import json
 import re
 
-VERSION = '1.0.1'
+VERSION = '2.0.0'
 APP = 'drz'
 HOME = os.path.join(os.path.dirname(sys.argv[0]), '..')
-pattern = re.compile(r'^([\da-z]+)\.(service-\w+-\d\.\d)$')
-print '''
+pattern = re.compile(r'^([\da-z]+)\.(\w+-\d\.\d)$')
+print('''
       _      _ _             ____             _             
      | | ___| | |_   _      |  _ \  ___ _ __ | | ___  _   _ 
   _  | |/ _ \ | | | | |_____| | | |/ _ \ '_ \| |/ _ \| | | |
  | |_| |  __/ | | |_| |_____| |_| |  __/ |_) | | (_) | |_| |
   \___/ \___|_|_|\__, |     |____/ \___| .__/|_|\___/ \__, |
                  |___/                 |_|            |___/ 
-'''
+''')
 print 'home: %s' % HOME
 
 parser = arg.ArgumentParser(prog="convert")
 parser.add_argument('package', metavar='PACKAGE', type=str, help=u'发布包(.zip)')
 
-group = parser.add_mutually_exclusive_group()
-group.add_argument('-up', '--upgrade', action='store_true', help=u'发布不兼容的版本')
-group.add_argument('-p', '--patch', action='store_true', help=u'发布兼容版本')
-
-parser.add_argument('-v', '--version', required=True, help=u'新的版本号或兼容的版本号')
+parser.add_argument('-mv', '--major_version', required=True, help=u'主版本号')
+parser.add_argument('-rv', '--revision_version', required=True, help=u'修正版本号')
+parser.add_argument('-n', '--name', required=True, help=u'包名称')
+parser.add_argument('-cs', '--checksum', required=True, help=u'包验证')
 args = parser.parse_args(sys.argv[1:])
 OUTPUT_DIR = '/'.join(args.package.split('/')[:-1])
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 print 'output: %s' % OUTPUT_DIR
-
-NAME = args.package.split('/')[-1:][0].split('-')[1]
-print 'name: %s' % NAME
 
 ZIP_PATH = os.path.join(os.getcwd(), args.package[0:-4])
 match = pattern.match(os.path.split(ZIP_PATH)[1])
@@ -52,6 +48,7 @@ config_path = os.path.join(HOME, 'config/akka.json')
 f = open(config_path, 'r')
 global_config = json.loads(f.read())
 f.close()
+
 
 def __find_runnable_script(path=ZIP_PATH):
     """
@@ -73,7 +70,7 @@ def __get_command():
     script = __find_runnable_script().replace(os.getcwd(), '')[1:]
     if script:
         os.chmod(script, stat.S_IRWXU)  # Read, write, and execute by owner
-        return script + ' %(app)s %(version)s %(type)s %(hostname)s %(name)s %(zookeeper)s'
+        return script + ' %(app)s %(major_version)s %(revision_version)s %(hostname)s %(name)s %(zookeeper)s %(checksum)s'
 
 
 def unzip():
@@ -82,9 +79,9 @@ def unzip():
     :return: 
     """
     if not is_newer():
-        print 'zip is older OR unzip failed'
+        print('zip is older OR unzip failed')
         return True
-    print 'unzip... %s ---> %s' % (args.package, OUTPUT_DIR)
+    print('unzip... %s ---> %s' % (args.package, OUTPUT_DIR))
     if args.package.endswith('.zip'):
         with zipfile.ZipFile(args.package) as f:
             f.extractall(OUTPUT_DIR)
@@ -94,27 +91,18 @@ def unzip():
             f.extractall(OUTPUT_DIR)
         return True
     else:
-        print 'FAILED...发布包必须是.zip或.tar!'
+        print('FAILED...发布包必须是.zip或.tar!')
         parser.print_help()
         return False
 
 
-def upgrade(**kwargs):
+def startup(**kwargs):
     """
     升级
     :param kwargs: 
     :return: 
     """
-    return __run_command(__get_command() % dict({'type': 'upgrade', 'name': NAME}, **kwargs))
-
-
-def patch(**kwargs):
-    """
-    补丁
-    :param kwargs: 
-    :return: 
-    """
-    return __run_command(__get_command() % dict({'type': 'patch', 'name': NAME}, **kwargs))
+    return __run_command(__get_command() % dict({}, **kwargs))
 
 
 def __run_command(cmd):
@@ -140,18 +128,18 @@ def deploy():
     if unzip():
         os.chdir(ZIP_PATH)
         print('change dir to %s' % ZIP_PATH)
-        config = {'app': APP,
-                  'version': args.version,
-                  'hostname': global_config['hostname'],
-                  'zookeeper': ','.join(global_config['zookeeper'])}
-        if args.upgrade:
-            upgrade(**config)
-        elif args.patch:
-            patch(**config)
-        else:
-            parser.print_help()
+        config = {
+            'app': APP,
+            'major_version': args.major_version,
+            'revision_version': args.revision_version,
+            'hostname': global_config['hostname'],
+            'zookeeper': ','.join(global_config['zookeeper']),
+            'checksum': args.checksum,
+            'name': args.name
+        }
+        startup(**config)
 
-    print 'finish...'
+    print('finish...')
     exit(0)
 
 
@@ -159,6 +147,6 @@ def deploy():
 ./jelly-deploy.py [-h] [-up | -p] -v VERSION PACKAGE
 """
 
-print 'args %s' % sys.argv
-print 'after parse % s' % args
+print('args %s' % sys.argv)
+print('after parse % s' % args)
 deploy()
