@@ -4,14 +4,12 @@ import sys
 import os
 import os.path
 import subprocess
-import zipfile
-import tarfile
 import argparse as arg
 import stat
 import json
 import re
 
-VERSION = '2.0.0'
+VERSION = '4.0.0'
 APP = 'drz'
 HOME = os.path.join(os.path.dirname(sys.argv[0]), '..')
 pattern = re.compile(r'^([\da-z]+)\.(\w+-\d\.\d)$')
@@ -23,26 +21,16 @@ print('''
   \___/ \___|_|_|\__, |     |____/ \___| .__/|_|\___/ \__, |
                  |___/                 |_|            |___/ 
 ''')
+print 'app code: %s' % APP
 print 'home: %s' % HOME
 
 parser = arg.ArgumentParser(prog="convert")
-parser.add_argument('package', metavar='PACKAGE', type=str, help=u'发布包(.zip)')
+parser.add_argument('package', metavar='PACKAGE', type=str, help=u'发布包(.jar)')
 
 parser.add_argument('-mv', '--major_version', required=True, help=u'主版本号')
 parser.add_argument('-rv', '--revision_version', required=True, help=u'修正版本号')
 parser.add_argument('-n', '--name', required=True, help=u'包名称')
-parser.add_argument('-cs', '--checksum', required=True, help=u'包验证')
 args = parser.parse_args(sys.argv[1:])
-OUTPUT_DIR = '/'.join(args.package.split('/')[:-1])
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-print 'output: %s' % OUTPUT_DIR
-
-ZIP_PATH = os.path.join(os.getcwd(), args.package[0:-4])
-match = pattern.match(os.path.split(ZIP_PATH)[1])
-if match:
-    ZIP_PATH = os.path.join(os.path.split(ZIP_PATH)[0], match.group(2))
-print 'zip path: %s' % ZIP_PATH
 
 config_path = os.path.join(HOME, 'config/akka.json')
 f = open(config_path, 'r')
@@ -50,50 +38,15 @@ global_config = json.loads(f.read())
 f.close()
 
 
-def __find_runnable_script(path=ZIP_PATH):
-    """
-    查找gradle打包出来的执行脚本
-    :param path: 
-    :return: 
-    """
-    for parent, dirs, file_items in os.walk(os.path.join(path, 'bin')):
-        for item in file_items:
-            if not item.endswith(".bat"):
-                return os.path.join(parent, item)
-
-
 def __get_command():
     """
     给执行脚本加上参数
     :return: 
     """
-    script = __find_runnable_script().replace(os.getcwd(), '')[1:]
+    script = 'java -jar %s' % args.package
     if script:
-        os.chmod(script, stat.S_IRWXU)  # Read, write, and execute by owner
-        return script + ' %(app)s %(major_version)s %(revision_version)s %(hostname)s %(name)s %(zookeeper)s %(checksum)s'
-
-
-def unzip():
-    """
-    解压gradle打包出来的.zip或.tar包
-    :return: 
-    """
-    if not is_newer():
-        print('zip is older OR unzip failed')
-        return True
-    print('unzip... %s ---> %s' % (args.package, OUTPUT_DIR))
-    if args.package.endswith('.zip'):
-        with zipfile.ZipFile(args.package) as f:
-            f.extractall(OUTPUT_DIR)
-        return True
-    elif args.package.endswith('.tar'):
-        with tarfile.TarFile(args.package) as f:
-            f.extractall(OUTPUT_DIR)
-        return True
-    else:
-        print('FAILED...发布包必须是.zip或.tar!')
-        parser.print_help()
-        return False
+        # os.chmod(script, stat.S_IRWXU)  # Read, write, and execute by owner
+        return script + ' %(app)s %(major_version)s %(revision_version)s %(hostname)s %(name)s %(zookeeper)s'
 
 
 def startup(**kwargs):
@@ -112,32 +65,20 @@ def __run_command(cmd):
     :return: 
     """
     cmd_args = ['nohup', cmd, '&']
-    print("cmd =", cmd_args)
+    print "cmd =", ' '.join(cmd_args)
     subprocess.Popen(' '.join(cmd_args), shell=True)
 
 
-def is_newer():
-    """
-    判断解压出来的文件夹是否比压缩包新
-    :return: 
-    """
-    return os.stat(args.package).st_mtime >= os.stat(ZIP_PATH).st_mtime if os.path.isdir(ZIP_PATH) else True
-
-
 def deploy():
-    if unzip():
-        os.chdir(ZIP_PATH)
-        print('change dir to %s' % ZIP_PATH)
-        config = {
-            'app': APP,
-            'major_version': args.major_version,
-            'revision_version': args.revision_version,
-            'hostname': global_config['hostname'],
-            'zookeeper': ','.join(global_config['zookeeper']),
-            'checksum': args.checksum,
-            'name': args.name
-        }
-        startup(**config)
+    config = {
+        'app': APP,
+        'major_version': args.major_version,
+        'revision_version': args.revision_version,
+        'hostname': global_config['hostname'],
+        'zookeeper': ','.join(global_config['zookeeper']),
+        'name': args.name
+    }
+    startup(**config)
 
     print('finish...')
     exit(0)
