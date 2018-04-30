@@ -43,10 +43,14 @@ def __get_command():
     给执行脚本加上参数
     :return: 
     """
-    script = 'java -jar %s' % args.package
-    if script:
-        # os.chmod(script, stat.S_IRWXU)  # Read, write, and execute by owner
-        return script + ' %(app)s %(major_version)s %(revision_version)s %(hostname)s %(name)s %(zookeeper)s'
+    return """java -jar \\
+    -Dservice.appcode='%(app)s' \\
+    -Dservice.version.major='%(major_version)s' \\
+    -Dservice.version.revision='%(revision_version)s' \\
+    -Dakka.remote.netty.tcp.hostname='%(hostname)s' \\
+    -Dservice.name='%(name)s' \\
+    -Dakka.registry.host='%(zookeeper)s' \\
+    """ + args.package
 
 
 def startup(**kwargs):
